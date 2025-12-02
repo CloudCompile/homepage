@@ -154,19 +154,24 @@ export default function App() {
             const responseText = data.choices?.[0]?.message?.content || "No response received from AI.";
             
             isSearch ? setAiSearchResponse(responseText) : setAiChatResponse(responseText);
+            isSearch ? setIsAISearching(false) : setIsAIChatting(false);
             return responseText;
 
         } catch (error) {
-            const errMsg = `AI Error: ${error.message}`;
-            isSearch ? setAiSearchResponse(errMsg) : setAiChatResponse(errMsg);
-            return errMsg;
-        } finally {
-             // Set loading false on success or after last attempt
-             if (attempt === maxRetries - 1 || (!isAIChatting && !isAISearching)) { 
-                 isSearch ? setIsAISearching(false) : setIsAIChatting(false);
-             }
+            console.error(`AI Error (attempt ${attempt + 1}/${maxRetries}):`, error);
+            if (attempt === maxRetries - 1) {
+                // Only set error message on final attempt
+                const errMsg = `AI Error: ${error.message}`;
+                isSearch ? setAiSearchResponse(errMsg) : setAiChatResponse(errMsg);
+                isSearch ? setIsAISearching(false) : setIsAIChatting(false);
+                return errMsg;
+            }
+            // Otherwise, continue to next retry attempt
         }
     }
+    
+    // If we get here, all retries failed
+    isSearch ? setIsAISearching(false) : setIsAIChatting(false);
 };
 
 const handleAIChatSubmit = (e) => {
@@ -201,39 +206,27 @@ const handleGenerateWallpaper = async () => {
     const model = 'nanobanana-pro';
     const suffix = ", 16:9 background, wallpaper, 4k";
     const finalPrompt = `${wallpaperPrompt}${suffix}`;
-    const apiUrl = `https://enter.pollinations.ai/api/generate/image`;
-
+    
     try {
+        // Pollinations image API: GET /generate/image/{prompt}
+        const apiUrl = `https://enter.pollinations.ai/api/generate/image/${encodeURIComponent(finalPrompt)}?model=${model}&width=1920&height=1080&nologo=true&key=${settings.pollinationsApiKey}`;
+        
         const res = await fetch(apiUrl, {
-            method: 'POST',
-            headers: { 
-                'Content-Type': 'application/json',
-                'Authorization': `Bearer ${settings.pollinationsApiKey}`
-            },
-            body: JSON.stringify({
-                prompt: finalPrompt,
-                model: model,
-                width: 1920, 
-                height: 1080,
-            })
+            method: 'GET',
         });
 
         if (!res.ok) throw new Error(`Status: ${res.status}`);
         
-        const data = await res.json();
-        const imageUrl = data.url; 
+        // The response is the image itself, so use the URL directly
+        const imageUrl = apiUrl;
 
-        if (imageUrl) {
-            setSettings(prev => ({ ...prev, wallpaper: imageUrl }));
-            setSettingsMessage('Wallpaper successfully generated and applied!');
-            setWallpaperPrompt('');
-        } else {
-             throw new Error('No image URL returned.');
-        }
+        setSettings(prev => ({ ...prev, wallpaper: imageUrl }));
+        setSettingsMessage('Wallpaper successfully generated and applied!');
+        setWallpaperPrompt('');
 
     } catch (error) {
+        console.error('Image generation error:', error);
         setSettingsMessage(`Image generation error. Check prompt and key. (${error.message})`);
-        setSettings(prev => ({ ...prev, wallpaper: WALLPAPERS[0].url })); 
     } finally {
         setIsGeneratingWallpaper(false);
     }
@@ -259,7 +252,7 @@ const handleGenerateWallpaper = async () => {
     }
 
     try {
-      let query = `q=${settings.location}`;
+      let query = `q=${encodeURIComponent(settings.location)}`;
       if (settings.isAutoLocation) {
         const pos = await new Promise((resolve, reject) => {
           navigator.geolocation.getCurrentPosition(resolve, reject);
@@ -279,6 +272,7 @@ const handleGenerateWallpaper = async () => {
         wind: data.wind.speed
       });
     } catch (err) {
+      console.error('Weather fetch error:', err);
       setWeather({
         temp: '--',
         condition: 'API Error',
