@@ -164,14 +164,10 @@ export default function App() {
                 const errMsg = `AI Error: ${error.message}`;
                 isSearch ? setAiSearchResponse(errMsg) : setAiChatResponse(errMsg);
                 isSearch ? setIsAISearching(false) : setIsAIChatting(false);
-                return errMsg;
             }
             // Otherwise, continue to next retry attempt
         }
     }
-    
-    // If we get here, all retries failed
-    isSearch ? setIsAISearching(false) : setIsAIChatting(false);
 };
 
 const handleAIChatSubmit = (e) => {
@@ -217,10 +213,10 @@ const handleGenerateWallpaper = async () => {
 
         if (!res.ok) throw new Error(`Status: ${res.status}`);
         
-        // The response is the image itself, so use the URL directly
-        const imageUrl = apiUrl;
+        // The API endpoint URL itself serves as the direct image URL
+        const generatedImageUrl = apiUrl;
 
-        setSettings(prev => ({ ...prev, wallpaper: imageUrl }));
+        setSettings(prev => ({ ...prev, wallpaper: generatedImageUrl }));
         setSettingsMessage('Wallpaper successfully generated and applied!');
         setWallpaperPrompt('');
 
